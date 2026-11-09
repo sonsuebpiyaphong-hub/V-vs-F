@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pink Trivia Show - Jeopardy Game</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Outfit:wght@400;600;800;900&display=swap" rel="stylesheet">
+    <!-- Canvas-Confetti for Winner Celebration -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        pastel: {
+                            pink: '#fbcfe8',
+                            pinkDark: '#f472b6',
+                            blue: '#bae6fd',
+                            blueDark: '#38bdf8',
+                            mint: '#a7f3d0',
+                            mintDark: '#34d399',
+                            lavender: '#e9d5ff',
+                            lavenderDark: '#c084fc',
+                            cream: '#fff1f2',
+                            cardBg: 'rgba(30, 27, 46, 0.85)',
+                            darkBg: '#181424'
+                        }
+                    },
+                    fontFamily: {
+                        heading: ['Outfit', 'sans-serif'],
+                        body: ['Fredoka', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            font-family: 'Fredoka', sans-serif;
+            background-color: #2b001d; /* Solid deep plum/pink background */
+            color: #ffffff;
+            min-height: 100vh;
+        }
+
+        .text-glow {
+            text-shadow: 0 0 10px rgba(255, 182, 217, 0.7);
+        }
+
+        .tile-card {
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        .tile-card:hover:not(.used) {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.6);
+        }
+
+        .pulse-active {
+            outline: 4px solid #facc15; /* High contrast solid yellow outline for active turn */
+        }
+
+        /* Custom scrollbar for editor */
+        ::-webkit-scrollbar {
+            width: 10px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #190011;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #f472b6;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen justify-between p-3 md:p-6 overflow-x-hidden selection:bg-pink-500 selection:text-white">
+
+    <!-- Top Bar Navigation & Controls -->
+    <header class="max-w-7xl w-full mx-auto flex flex-wrap justify-between items-center gap-4 mb-4 bg-pink-950 border-2 border-pink-400 p-4 rounded-2xl shadow-xl">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-yellow-400 flex items-center justify-center text-xl shadow-md text-black font-extrabold">
+                <i class="fa-solid fa-sack-dollar"></i>
+            </div>
+            <h1 id="appTitleDisplay" class="font-heading text-2xl md:text-3xl font-black tracking-wide text-pink-200">
+                F vs V Jeopardy Game
+            </h1>
+        </div>
+
+        <!-- Action Controls -->
+        <div class="flex items-center gap-2 md:gap-3 flex-wrap">
+            <button onclick="toggleEditor()" class="px-4 py-2 bg-purple-800 hover:bg-purple-700 text-white border-2 border-purple-400 rounded-xl font-bold transition text-sm flex items-center gap-2">
+                <i class="fa-solid fa-pen-to-square"></i> Edit Questions
+            </button>
+            <button onclick="resetGamePrompt()" class="px-4 py-2 bg-rose-700 hover:bg-rose-600 text-white border-2 border-rose-400 rounded-xl font-bold transition text-sm flex items-center gap-2">
+                <i class="fa-solid fa-rotate-left"></i> Reset Game
+            </button>
+        </div>
+    </header>
+
+    <!-- Scoreboards Header -->
+    <section class="max-w-7xl w-full mx-auto grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4 mb-6">
+        <!-- Team 1 -->
+        <div id="teamCard1" onclick="setActiveTeam(0)" class="cursor-pointer bg-pink-900 border-4 border-pink-400 rounded-2xl p-4 flex justify-between items-center transition-all duration-200 hover:border-yellow-400 relative overflow-hidden">
+            <div>
+                <span class="text-xs uppercase font-extrabold tracking-widest text-pink-200 block mb-1">Scoreboard</span>
+                <h3 id="teamName0" class="font-heading text-xl md:text-2xl font-black text-white">Team 1</h3>
+                <p id="turnBadge0" class="text-xs font-black text-yellow-300 mt-1 hidden"><i class="fa-solid fa-circle-play animate-pulse"></i> Selecting Question</p>
+            </div>
+            <div class="text-right">
+                <span id="score0" class="font-heading text-3xl md:text-4xl font-black text-yellow-300">$0</span>
+                <span class="text-xs text-pink-200 block font-bold">CASH BALANCE</span>
+            </div>
+        </div>
+
+        <!-- Team 2 -->
+        <div id="teamCard2" onclick="setActiveTeam(1)" class="cursor-pointer bg-sky-950 border-4 border-sky-400 rounded-2xl p-4 flex justify-between items-center transition-all duration-200 hover:border-yellow-400 relative overflow-hidden">
+            <div>
+                <span class="text-xs uppercase font-extrabold tracking-widest text-sky-200 block mb-1">Scoreboard</span>
+                <h3 id="teamName1" class="font-heading text-xl md:text-2xl font-black text-white">Team 2</h3>
+                <p id="turnBadge1" class="text-xs font-black text-yellow-300 mt-1 hidden"><i class="fa-solid fa-circle-play animate-pulse"></i> Selecting Question</p>
+            </div>
+            <div class="text-right">
+                <span id="score1" class="font-heading text-3xl md:text-4xl font-black text-yellow-300">$0</span>
+                <span class="text-xs text-sky-200 block font-bold">CASH BALANCE</span>
+            </div>
+        </div>
+
+        <!-- Team 3 -->
+        <div id="teamCard3" onclick="setActiveTeam(2)" class="cursor-pointer bg-emerald-950 border-4 border-emerald-400 rounded-2xl p-4 flex justify-between items-center transition-all duration-200 hover:border-yellow-400 relative overflow-hidden">
+            <div>
+                <span class="text-xs uppercase font-extrabold tracking-widest text-emerald-200 block mb-1">Scoreboard</span>
+                <h3 id="teamName2" class="font-heading text-xl md:text-2xl font-black text-white">Team 3</h3>
+                <p id="turnBadge2" class="text-xs font-black text-yellow-300 mt-1 hidden"><i class="fa-solid fa-circle-play animate-pulse"></i> Selecting Question</p>
+            </div>
+            <div class="text-right">
+                <span id="score2" class="font-heading text-3xl md:text-4xl font-black text-yellow-300">$0</span>
+                <span class="text-xs text-emerald-200 block font-bold">CASH BALANCE</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- Main Game Board Container -->
+    <main class="max-w-7xl w-full mx-auto flex-1 flex flex-col justify-center">
+        <!-- Status Indicator Bar -->
+        <div class="mb-4 text-center">
+            <span class="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-pink-950 border-2 border-pink-400 text-white text-base md:text-lg font-bold shadow-lg">
+                <i class="fa-solid fa-crown text-yellow-400 text-xl"></i> Turn: <span id="currentTurnText" class="text-yellow-300 font-extrabold underline decoration-yellow-400">Team 1</span> — Select any available clue!
+            </span>
+        </div>
+
+        <!-- 3 x 4 Grid Matrix -->
+        <div id="gameGrid" class="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+            <!-- Row Columns dynamic injection -->
+        </div>
+    </main>
+
+    <!-- Question Modal Screen -->
+    <div id="questionModal" class="fixed inset-0 bg-black/95 z-40 hidden flex items-center justify-center p-4">
+        <div class="bg-pink-950 border-4 border-pink-400 rounded-3xl p-6 md:p-10 max-w-4xl w-full text-center shadow-2xl relative flex flex-col justify-between min-h-[500px]">
+            
+            <!-- Modal Header info -->
+            <div class="flex justify-between items-center border-b-2 border-pink-800 pb-4">
+                <span id="modalCategoryBadge" class="bg-pink-900 border-2 border-pink-400 text-white font-extrabold px-5 py-2 rounded-full text-base tracking-wide">
+                    Category Name
+                </span>
+                <span id="modalPointsBadge" class="font-heading text-3xl font-black text-yellow-300">
+                    $100
+                </span>
+            </div>
+
+            <!-- Clue / Question Content -->
+            <div class="my-6 flex-1 flex flex-col justify-center items-center px-2">
+                <p id="modalQuestionText" class="text-2xl md:text-4xl font-heading font-black text-white leading-relaxed tracking-wide">
+                    "Question text goes here..."
+                </p>
+
+                <!-- Revealed Answer Box -->
+                <div id="modalAnswerContainer" class="mt-6 p-5 rounded-2xl bg-purple-900 border-2 border-purple-400 w-full max-w-2xl hidden">
+                    <span class="text-xs uppercase text-purple-200 font-extrabold block mb-1">Answer</span>
+                    <p id="modalAnswerText" class="text-xl md:text-3xl font-black text-yellow-300">
+                        "Answer text goes here..."
+                    </p>
+                </div>
+            </div>
+
+            <!-- Buzzers / Team Selector Area -->
+            <div class="mb-6 bg-pink-900 p-4 rounded-2xl border-2 border-pink-700">
+                <p id="buzzerInstruction" class="text-xs uppercase font-black text-pink-200 tracking-wider mb-3">
+                    Select Team Buzzing In:
+                </p>
+                
+                <div class="grid grid-cols-3 gap-3 max-w-xl mx-auto">
+                    <button id="buzzBtn0" onclick="teamBuzzIn(0)" class="py-3 px-2 rounded-xl bg-pink-500 hover:bg-pink-400 text-white font-black text-base transition border-2 border-white shadow-lg flex flex-col items-center justify-center gap-1 group">
+                        <i class="fa-solid fa-bullhorn text-yellow-300 group-hover:scale-110 transition"></i>
+                        <span id="modalTeamName0">Team 1</span>
+                    </button>
+                    <button id="buzzBtn1" onclick="teamBuzzIn(1)" class="py-3 px-2 rounded-xl bg-sky-500 hover:bg-sky-400 text-white font-black text-base transition border-2 border-white shadow-lg flex flex-col items-center justify-center gap-1 group">
+                        <i class="fa-solid fa-bullhorn text-yellow-300 group-hover:scale-110 transition"></i>
+                        <span id="modalTeamName1">Team 2</span>
+                    </button>
+                    <button id="buzzBtn2" onclick="teamBuzzIn(2)" class="py-3 px-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white font-black text-base transition border-2 border-white shadow-lg flex flex-col items-center justify-center gap-1 group">
+                        <i class="fa-solid fa-bullhorn text-yellow-300 group-hover:scale-110 transition"></i>
+                        <span id="modalTeamName2">Team 3</span>
+                    </button>
+                </div>
+
+                <div id="activeBuzzedBanner" class="mt-3 hidden">
+                    <span class="inline-block bg-yellow-400 text-black font-black px-5 py-2 rounded-full text-base shadow-md border-2 border-black">
+                        <i class="fa-solid fa-bolt text-red-600"></i> <span id="buzzedTeamText">Team 1</span> HAS THE FLOOR!
+                    </span>
+                </div>
+            </div>
+
+            <!-- Modal Action Buttons Footer -->
+            <div class="flex flex-wrap items-center justify-between gap-3 pt-4 border-t-2 border-pink-800">
+                <button onclick="closeModal()" class="px-5 py-3 rounded-xl bg-gray-800 hover:bg-gray-700 text-white border-2 border-gray-500 font-bold text-sm transition">
+                    <i class="fa-solid fa-arrow-left"></i> Back to Board
+                </button>
+
+                <div class="flex items-center gap-3">
+                    <button id="showAnswerBtn" onclick="toggleRevealAnswer()" class="px-6 py-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-black text-base transition border-2 border-purple-300 shadow-lg">
+                        <i class="fa-solid fa-eye"></i> Show Answer
+                    </button>
+
+                    <!-- Judgement Controls -->
+                    <div id="judgementBtns" class="flex gap-2">
+                        <button id="correctBtn" onclick="judgeAnswer(true)" class="px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-base transition border-2 border-emerald-300 shadow-lg flex items-center gap-2">
+                            <i class="fa-solid fa-check"></i> Correct (+Cash)
+                        </button>
+                        <button id="incorrectBtn" onclick="judgeAnswer(false)" class="px-6 py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-black text-base transition border-2 border-red-300 shadow-lg flex items-center gap-2">
+                            <i class="fa-solid fa-xmark"></i> Incorrect (-Cash)
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Over Screen Modal -->
+    <div id="gameOverModal" class="fixed inset-0 bg-black/95 z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-pink-950 border-4 border-pink-400 rounded-3xl p-8 md:p-12 max-w-2xl w-full text-center shadow-2xl relative overflow-hidden">
+            <div class="w-24 h-24 bg-yellow-400 rounded-full flex items-center justify-center text-4xl mx-auto mb-6 text-black border-4 border-white shadow-xl">
+                <i class="fa-solid fa-crown"></i>
+            </div>
+            
+            <h2 class="font-heading text-4xl md:text-5xl font-black text-white mb-2">GAME OVER</h2>
+            <p id="winnerText" class="text-2xl md:text-3xl font-black text-yellow-300 mb-8">
+                Team 1 Wins!
+            </p>
+
+            <!-- Final Scores Leaderboard -->
+            <div class="bg-pink-900 border-2 border-pink-700 rounded-2xl p-5 mb-8 space-y-3">
+                <h4 class="text-xs uppercase font-black text-pink-200 tracking-widest border-b border-pink-800 pb-2">Final Cash Earnings</h4>
+                <div id="finalScoresList" class="space-y-2">
+                    <!-- Dynamic Insertion -->
+                </div>
+            </div>
+
+            <button onclick="resetGame()" class="w-full py-4 rounded-2xl bg-yellow-400 hover:bg-yellow-300 text-black border-4 border-white font-heading font-black text-2xl tracking-wider transition shadow-xl transform hover:-translate-y-0.5">
+                <i class="fa-solid fa-rotate-left mr-2"></i> PLAY AGAIN
+            </button>
+        </div>
+    </div>
+
+    <!-- Live Customizer / Editor Drawer -->
+    <div id="editorDrawer" class="fixed top-0 right-0 h-full w-full max-w-xl bg-pink-950 z-50 transform translate-x-full transition-transform duration-300 ease-in-out border-l-4 border-pink-400 shadow-2xl flex flex-col">
+        <!-- Drawer Header -->
+        <div class="p-5 border-b-2 border-pink-800 flex justify-between items-center bg-pink-900">
+            <div class="flex items-center gap-2">
+                <i class="fa-solid fa-sliders text-yellow-400 text-xl"></i>
+                <h3 class="font-heading font-extrabold text-xl text-white">Board & Clues Editor</h3>
+            </div>
+            <button onclick="toggleEditor()" class="text-white hover:text-yellow-300 text-2xl p-2 font-bold">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+
+        <!-- Drawer Form List -->
+        <div class="p-6 flex-1 overflow-y-auto space-y-6">
+            <!-- Global Setup -->
+            <div class="space-y-4 bg-pink-900/60 p-4 rounded-xl border-2 border-pink-700">
+                <h4 class="font-extrabold text-yellow-300 text-sm uppercase tracking-wide">Game Title & Team Names</h4>
+                <div>
+                    <label class="text-xs text-white font-bold block mb-1">Game Title</label>
+                    <input type="text" id="editGameTitle" class="w-full bg-pink-950 border-2 border-pink-500 rounded-lg p-2.5 text-white font-bold text-sm focus:outline-none focus:border-yellow-400">
+                </div>
+                <div class="grid grid-cols-3 gap-2">
+                    <div>
+                        <label class="text-xs text-white font-bold block mb-1">Team 1 Name</label>
+                        <input type="text" id="editTeam1" class="w-full bg-pink-950 border-2 border-pink-500 rounded-lg p-2.5 text-white font-bold text-sm focus:outline-none focus:border-yellow-400">
+                    </div>
+                    <div>
+                        <label class="text-xs text-white font-bold block mb-1">Team 2 Name</label>
+                        <input type="text" id="editTeam2" class="w-full bg-pink-950 border-2 border-pink-500 rounded-lg p-2.5 text-white font-bold text-sm focus:outline-none focus:border-yellow-400">
+                    </div>
+                    <div>
+                        <label class="text-xs text-white font-bold block mb-1">Team 3 Name</label>
+                        <input type="text" id="editTeam3" class="w-full bg-pink-950 border-2 border-pink-500 rounded-lg p-2.5 text-white font-bold text-sm focus:outline-none focus:border-yellow-400">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dynamic Category & Clues Form -->
+            <div id="editorCluesList" class="space-y-6">
+                <!-- Dynamically Generated Clues Form -->
+            </div>
+        </div>
+
+        <!-- Drawer Footer Actions -->
+        <div class="p-4 border-t-2 border-pink-800 bg-pink-900 flex gap-3">
+            <button onclick="saveCustomEditorData()" class="flex-1 py-3 bg-yellow-400 hover:bg-yellow-300 text-black font-black rounded-xl text-base transition border-2 border-white shadow-lg">
+                <i class="fa-solid fa-floppy-disk mr-1"></i> Save Board Changes
+            </button>
+            <button onclick="resetDefaultClues()" class="px-4 py-3 bg-gray-800 hover:bg-gray-700 text-white font-bold rounded-xl text-sm transition border border-gray-500">
+                Reset Clues
+            </button>
+        </div>
+    </div>
+
+    <!-- Footer Credit -->
+    <footer class="max-w-7xl w-full mx-auto text-center text-xs font-bold text-pink-300 py-4">
+        F vs V Jeopardy Game • Solid Color High-Contrast Edition
+    </footer>
+
+    <!-- Game Engine Logic -->
+    <script>
+        // Default Pre-Populated Data (F vs V Tongue Twisters)
+        const DEFAULT_GAME_DATA = {
+            title: "F vs V Jeopardy Game",
+            teams: ["Team 1", "Team 2", "Team 3"],
+            rows: [
+                {
+                    name: "Row 1 (Easy)",
+                    clues: [
+                        { points: 100, question: "Fred loves fresh fruit.", answer: "Fred loves fresh fruit." },
+                        { points: 200, question: "Four visitors view five vast fields.", answer: "Four visitors view five vast fields." },
+                        { points: 300, question: "Five very fast visitors view five vivid flames.", answer: "Five very fast visitors view five vivid flames." },
+                        { points: 400, question: "Valiant visitors found five fresh violet flowers for Fred.", answer: "Valiant visitors found five fresh violet flowers for Fred." }
+                    ]
+                },
+                {
+                    name: "Row 2 (Medium)",
+                    clues: [
+                        { points: 100, question: "Vic found four valves.", answer: "Vic found four valves." },
+                        { points: 200, question: "Vicky found four fast silver vans.", answer: "Vicky found four fast silver vans." },
+                        { points: 300, question: "Fred’s four favorite friends found five velvet vests.", answer: "Fred’s four favorite friends found five velvet vests." },
+                        { points: 400, question: "Four funny farmers saved five very valuable velvet vines.", answer: "Four funny farmers saved five very valuable velvet vines." }
+                    ]
+                },
+                {
+                    name: "Row 3 (Hard)",
+                    clues: [
+                        { points: 100, question: "Five fine vines fall.", answer: "Five fine vines fall." },
+                        { points: 200, question: "Five friendly foxes view colorful leaves.", answer: "Five friendly foxes view colorful leaves." },
+                        { points: 300, question: "Vivian’s five funny friends visit four fine villages.", answer: "Vivian’s five funny friends visit four fine villages." },
+                        { points: 400, question: "Five fierce foxes view four vibrant villages in full view.", answer: "Five fierce foxes view four vibrant villages in full view." }
+                    ]
+                }
+            ]
+        };
+
+        // Active State Variables
+        let gameState = {
+            data: JSON.parse(localStorage.getItem('f_vs_v_jeopardy_data')) || JSON.parse(JSON.stringify(DEFAULT_GAME_DATA)),
+            scores: [0, 0, 0],
+            activeTurnIndex: 0,
+            usedTiles: new Array(12).fill(false),
+            currentTile: null, // { rowIndex, clueIndex, points, question, answer }
+            buzzedTeam: null,
+            disabledBuzzers: [false, false, false]
+        };
+
+        // Audio Management with HTML5 Audio & Web Audio API Fallback
+        const correctAudio = new Audio('Correct-ding.mp3');
+        const incorrectAudio = new Audio('Incorrect-ding.mp3');
+
+        let audioCtx = null;
+
+        function getAudioContext() {
+            if (!audioCtx) {
+                const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                if (AudioContextClass) {
+                    audioCtx = new AudioContextClass();
+                }
+            }
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            return audioCtx;
+        }
+
+        // Unlock audio context on user interaction
+        function unlockAudio() {
+            getAudioContext();
+            correctAudio.load();
+            incorrectAudio.load();
+            window.removeEventListener('click', unlockAudio);
+            window.removeEventListener('touchstart', unlockAudio);
+        }
+        window.addEventListener('click', unlockAudio);
+        window.addEventListener('touchstart', unlockAudio);
+
+        // Fallback Synthesized Audio (used if MP3 files fail to play or load)
+        function playSynthSound(type) {
+            try {
+                const ctx = getAudioContext();
+                if (!ctx) return;
+
+                if (type === 'correct') {
+                    // Upbeat pleasant ding chime
+                    const now = ctx.currentTime;
+                    const osc1 = ctx.createOscillator();
+                    const osc2 = ctx.createOscillator();
+                    const gain = ctx.createGain();
+
+                    osc1.type = 'sine';
+                    osc2.type = 'sine';
+                    osc1.frequency.setValueAtTime(523.25, now); // C5
+                    osc2.frequency.setValueAtTime(659.25, now + 0.1); // E5
+
+                    gain.gain.setValueAtTime(0.3, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+
+                    osc1.connect(gain);
+                    osc2.connect(gain);
+                    gain.connect(ctx.destination);
+
+                    osc1.start(now);
+                    osc1.stop(now + 0.2);
+                    osc2.start(now + 0.1);
+                    osc2.stop(now + 0.5);
+                } else if (type === 'incorrect') {
+                    // Classic game show error buzzer
+                    const now = ctx.currentTime;
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(150, now);
+                    osc.frequency.exponentialRampToValueAtTime(110, now + 0.35);
+
+                    gain.gain.setValueAtTime(0.35, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+
+                    osc.start(now);
+                    osc.stop(now + 0.35);
+                }
+            } catch (e) {
+                console.log('Synth audio playback error:', e);
+            }
+        }
+
+        function playSound(type) {
+            getAudioContext();
+            if (type === 'correct') {
+                correctAudio.currentTime = 0;
+                correctAudio.play().catch(e => {
+                    console.warn('MP3 play failed, falling back to Web Audio synth:', e);
+                    playSynthSound('correct');
+                });
+            } else if (type === 'incorrect') {
+                incorrectAudio.currentTime = 0;
+                incorrectAudio.play().catch(e => {
+                    console.warn('MP3 play failed, falling back to Web Audio synth:', e);
+                    playSynthSound('incorrect');
+                });
+            }
+        }
+
+        // Format number to currency format (handles negative cash cleanly)
+        function formatCurrency(amount) {
+            if (amount < 0) {
+                return `-$${Math.abs(amount)}`;
+            }
+            return `$${amount}`;
+        }
+
+        // Initialize App on DOM Ready
+        window.onload = function() {
+            renderHeaderScores();
+            renderBoard();
+            buildEditorForm();
+        };
+
+        // Render Scoreboard and Turn Badges
+        function renderHeaderScores() {
+            document.getElementById('appTitleDisplay').innerText = gameState.data.title;
+
+            for (let i = 0; i < 3; i++) {
+                const teamName = gameState.data.teams[i] || `Team ${i + 1}`;
+                document.getElementById(`teamName${i}`).innerText = teamName;
+                document.getElementById(`modalTeamName${i}`).innerText = teamName;
+                document.getElementById(`score${i}`).innerText = formatCurrency(gameState.scores[i]);
+
+                const card = document.getElementById(`teamCard${i + 1}`);
+                const badge = document.getElementById(`turnBadge${i}`);
+
+                if (i === gameState.activeTurnIndex) {
+                    card.classList.add('pulse-active');
+                    badge.classList.remove('hidden');
+                } else {
+                    card.classList.remove('pulse-active');
+                    badge.classList.add('hidden');
+                }
+            }
+
+            document.getElementById('currentTurnText').innerText = gameState.data.teams[gameState.activeTurnIndex];
+        }
+
+        // Render Grid Tiles (3 Rows x 4 Tiles = 12 Tiles with SOLID HIGH-CONTRAST colors)
+        function renderBoard() {
+            const gridContainer = document.getElementById('gameGrid');
+            gridContainer.innerHTML = '';
+
+            // Solid high-contrast background styles for row headers & tiles
+            const rowStyles = [
+                { headerBg: 'bg-pink-700', border: 'border-pink-300', text: 'text-white' },
+                { headerBg: 'bg-sky-700', border: 'border-sky-300', text: 'text-white' },
+                { headerBg: 'bg-emerald-700', border: 'border-emerald-300', text: 'text-white' }
+            ];
+
+            gameState.data.rows.forEach((row, rowIndex) => {
+                const rowCol = document.createElement('div');
+                rowCol.className = 'flex flex-col gap-3';
+
+                const style = rowStyles[rowIndex % rowStyles.length];
+
+                // Row Category Title Header - SOLID Colors
+                const rowHeader = document.createElement('div');
+                rowHeader.className = `${style.headerBg} border-3 ${style.border} rounded-2xl p-4 text-center shadow-lg`;
+                rowHeader.innerHTML = `
+                    <h3 class="font-heading font-black text-white text-xl md:text-2xl tracking-wide">${row.name}</h3>
+                `;
+                rowCol.appendChild(rowHeader);
+
+                // Row Point Tiles - SOLID Yellow Tiles with High Contrast Dark Text
+                row.clues.forEach((clue, clueIndex) => {
+                    const tileId = rowIndex * 4 + clueIndex;
+                    const isUsed = gameState.usedTiles[tileId];
+
+                    const tileBtn = document.createElement('button');
+                    tileBtn.disabled = isUsed;
+
+                    if (isUsed) {
+                        tileBtn.className = 'tile-card w-full py-6 md:py-8 bg-pink-950 border-2 border-pink-900 rounded-2xl flex flex-col items-center justify-center opacity-30 cursor-not-allowed used';
+                        tileBtn.innerHTML = `<span class="font-heading text-3xl font-black text-gray-500 line-through">$${clue.points}</span>`;
+                    } else {
+                        tileBtn.className = `tile-card w-full py-6 md:py-8 bg-yellow-400 hover:bg-yellow-300 border-4 border-white rounded-2xl flex flex-col items-center justify-center shadow-xl cursor-pointer active:scale-95 text-black`;
+                        tileBtn.onclick = () => openQuestion(rowIndex, clueIndex);
+                        tileBtn.innerHTML = `
+                            <span class="font-heading text-3xl md:text-4xl font-black text-black">${formatCurrency(clue.points)}</span>
+                        `;
+                    }
+
+                    rowCol.appendChild(tileBtn);
+                });
+
+                gridContainer.appendChild(rowCol);
+            });
+        }
+
+        // Open Question Modal
+        function openQuestion(rowIndex, clueIndex) {
+            const clue = gameState.data.rows[rowIndex].clues[clueIndex];
+            gameState.currentTile = { rowIndex, clueIndex, ...clue };
+            gameState.buzzedTeam = null;
+            gameState.disabledBuzzers = [false, false, false];
+
+            // Update UI elements inside modal
+            document.getElementById('modalCategoryBadge').innerText = gameState.data.rows[rowIndex].name;
+            document.getElementById('modalPointsBadge').innerText = formatCurrency(clue.points);
+            document.getElementById('modalQuestionText').innerText = `"${clue.question}"`;
+            document.getElementById('modalAnswerText').innerText = `"${clue.answer || clue.question}"`;
+
+            // Reset modal states
+            document.getElementById('modalAnswerContainer').classList.add('hidden');
+            document.getElementById('showAnswerBtn').classList.remove('hidden');
+            document.getElementById('activeBuzzedBanner').classList.add('hidden');
+            
+            updateBuzzerButtonsUI();
+
+            document.getElementById('questionModal').classList.remove('hidden');
+        }
+
+        // Update Buzzer Buttons Disabled States
+        function updateBuzzerButtonsUI() {
+            const colors = [
+                'bg-pink-300 hover:bg-pink-200',
+                'bg-sky-300 hover:bg-sky-200',
+                'bg-mint-300 hover:bg-mint-200'
+            ];
+
+            for (let i = 0; i < 3; i++) {
+                const btn = document.getElementById(`buzzBtn${i}`);
+                if (gameState.disabledBuzzers[i]) {
+                    btn.disabled = true;
+                    btn.className = 'py-3 px-2 rounded-xl bg-gray-800 text-gray-500 font-bold text-sm transition shadow-lg flex flex-col items-center justify-center gap-1 opacity-30 cursor-not-allowed';
+                } else {
+                    btn.disabled = false;
+                    btn.className = `py-3 px-2 rounded-xl ${colors[i]} text-gray-900 font-bold text-sm transition shadow-lg flex flex-col items-center justify-center gap-1 group`;
+                }
+            }
+        }
+
+        // Handle Buzz In Action
+        function teamBuzzIn(teamIndex) {
+            if (gameState.disabledBuzzers[teamIndex]) return;
+
+            gameState.buzzedTeam = teamIndex;
+            document.getElementById('buzzedTeamText').innerText = gameState.data.teams[teamIndex];
+            document.getElementById('activeBuzzedBanner').classList.remove('hidden');
+        }
+
+        // Reveal Answer Toggle
+        function toggleRevealAnswer() {
+            document.getElementById('modalAnswerContainer').classList.remove('hidden');
+            document.getElementById('showAnswerBtn').classList.add('hidden');
+        }
+
+        // Judge Answer: Correct or Incorrect
+        function judgeAnswer(isCorrect) {
+            // Default to current turn team if no one buzzed in directly
+            const activeTeam = gameState.buzzedTeam !== null ? gameState.buzzedTeam : gameState.activeTurnIndex;
+            const points = gameState.currentTile.points;
+
+            // Mark current tile as used in all cases when judged
+            const tileId = gameState.currentTile.rowIndex * 4 + gameState.currentTile.clueIndex;
+            gameState.usedTiles[tileId] = true;
+
+            if (isCorrect) {
+                // Play upbeat correct sound effect
+                playSound('correct');
+
+                // Add points/cash to active team
+                gameState.scores[activeTeam] += points;
+
+                // Switch turn to the team that answered correctly
+                gameState.activeTurnIndex = activeTeam;
+            } else {
+                // Play buzz sound effect
+                playSound('incorrect');
+
+                // Incorrect: Deduct points/cash from active team
+                gameState.scores[activeTeam] -= points;
+
+                // Rotate turn to the next team automatically
+                gameState.activeTurnIndex = (activeTeam + 1) % gameState.data.teams.length;
+            }
+
+            // Immediately close modal, refresh scores and board, check game over
+            closeModal();
+            checkGameOver();
+        }
+
+        // Set Active Selection Turn Manually
+        function setActiveTeam(teamIndex) {
+            gameState.activeTurnIndex = teamIndex;
+            renderHeaderScores();
+        }
+
+        // Close Question Modal
+        function closeModal() {
+            document.getElementById('questionModal').classList.add('hidden');
+            renderHeaderScores();
+            renderBoard();
+        }
+
+        // Check for Game Over condition (All 12 tiles used)
+        function checkGameOver() {
+            const allUsed = gameState.usedTiles.every(tile => tile === true);
+            if (allUsed) {
+                showGameOver();
+            }
+        }
+
+        // Display Game Over Screen
+        function showGameOver() {
+            const winnerText = document.getElementById('winnerText');
+            const leaderboard = document.getElementById('finalScoresList');
+            leaderboard.innerHTML = '';
+
+            // Compute high score & winner
+            const maxScore = Math.max(...gameState.scores);
+            const winners = [];
+            gameState.scores.forEach((score, idx) => {
+                if (score === maxScore) winners.push(gameState.data.teams[idx]);
+            });
+
+            if (winners.length > 1) {
+                winnerText.innerText = `It's a Tie! (${formatCurrency(maxScore)})`;
+            } else {
+                winnerText.innerText = `🎉 ${winners[0]} Wins! (${formatCurrency(maxScore)})`;
+            }
+
+            // Create Leaderboard Rows
+            const sortedTeams = gameState.data.teams.map((name, i) => ({
+                name,
+                score: gameState.scores[i]
+            })).sort((a, b) => b.score - a.score);
+
+            sortedTeams.forEach((t, rank) => {
+                const row = document.createElement('div');
+                row.className = 'flex justify-between items-center bg-purple-900/40 p-3 rounded-xl border border-purple-300/20';
+                row.innerHTML = `
+                    <span class="font-bold text-white"><span class="text-pink-300 mr-2">#${rank + 1}</span> ${t.name}</span>
+                    <span class="font-heading font-black text-xl text-pink-200">${formatCurrency(t.score)}</span>
+                `;
+                leaderboard.appendChild(row);
+            });
+
+            document.getElementById('gameOverModal').classList.remove('hidden');
+
+            // Trigger Confetti effect
+            confetti({
+                particleCount: 120,
+                spread: 80,
+                origin: { y: 0.6 }
+            });
+        }
+
+        // Reset Entire Game
+        function resetGame() {
+            gameState.scores = [0, 0, 0];
+            gameState.usedTiles = new Array(12).fill(false);
+            gameState.activeTurnIndex = 0;
+            gameState.currentTile = null;
+            gameState.buzzedTeam = null;
+            gameState.disabledBuzzers = [false, false, false];
+
+            // Hide modals if open
+            document.getElementById('gameOverModal').classList.add('hidden');
+            document.getElementById('questionModal').classList.add('hidden');
+
+            renderHeaderScores();
+            renderBoard();
+        }
+
+        function resetGamePrompt() {
+            // Direct reset to avoid iframe browser prompt blocking
+            resetGame();
+        }
+
+        // Drawer Customization logic
+        function toggleEditor() {
+            const drawer = document.getElementById('editorDrawer');
+            drawer.classList.toggle('translate-x-full');
+        }
+
+        function buildEditorForm() {
+            document.getElementById('editGameTitle').value = gameState.data.title;
+            document.getElementById('editTeam1').value = gameState.data.teams[0];
+            document.getElementById('editTeam2').value = gameState.data.teams[1];
+            document.getElementById('editTeam3').value = gameState.data.teams[2];
+
+            const container = document.getElementById('editorCluesList');
+            container.innerHTML = '';
+
+            gameState.data.rows.forEach((row, rIdx) => {
+                const rowSec = document.createElement('div');
+                rowSec.className = 'bg-pink-900 p-4 rounded-xl border-2 border-pink-700 space-y-3';
+                rowSec.innerHTML = `
+                    <div class="mb-2">
+                        <label class="text-xs uppercase font-black text-yellow-300 block mb-1">Row ${rIdx + 1} Title</label>
+                        <input type="text" id="rowTitle_${rIdx}" value="${row.name}" class="w-full bg-pink-950 border-2 border-pink-500 rounded-lg p-2 text-white font-bold text-sm">
+                    </div>
+                `;
+
+                row.clues.forEach((clue, cIdx) => {
+                    const clueBlock = document.createElement('div');
+                    clueBlock.className = 'bg-pink-950 p-3 rounded-lg border border-pink-700 space-y-2';
+                    clueBlock.innerHTML = `
+                        <div class="flex justify-between items-center">
+                            <span class="text-xs font-black text-yellow-300">Tile ${cIdx + 1} ($${clue.points})</span>
+                        </div>
+                        <input type="text" id="clueQ_${rIdx}_${cIdx}" value="${clue.question}" placeholder="Question/Clue" class="w-full bg-pink-900 border border-pink-600 rounded p-2 text-white font-bold text-xs">
+                        <input type="text" id="clueA_${rIdx}_${cIdx}" value="${clue.answer || ''}" placeholder="Answer" class="w-full bg-pink-900 border border-pink-600 rounded p-2 text-yellow-300 font-bold text-xs">
+                    `;
+                    rowSec.appendChild(clueBlock);
+                });
+
+                container.appendChild(rowSec);
+            });
+        }
+
+        function saveCustomEditorData() {
+            gameState.data.title = document.getElementById('editGameTitle').value;
+            gameState.data.teams[0] = document.getElementById('editTeam1').value || "Team 1";
+            gameState.data.teams[1] = document.getElementById('editTeam2').value || "Team 2";
+            gameState.data.teams[2] = document.getElementById('editTeam3').value || "Team 3";
+
+            gameState.data.rows.forEach((row, rIdx) => {
+                row.name = document.getElementById(`rowTitle_${rIdx}`).value;
+                row.clues.forEach((clue, cIdx) => {
+                    clue.question = document.getElementById(`clueQ_${rIdx}_${cIdx}`).value;
+                    clue.answer = document.getElementById(`clueA_${rIdx}_${cIdx}`).value;
+                });
+            });
+
+            // Save to LocalStorage for persistence
+            localStorage.setItem('f_vs_v_jeopardy_data', JSON.stringify(gameState.data));
+
+            renderHeaderScores();
+            renderBoard();
+            toggleEditor();
+        }
+
+        function resetDefaultClues() {
+            if (confirm("Reset all questions back to the default tongue twisters?")) {
+                gameState.data = JSON.parse(JSON.stringify(DEFAULT_GAME_DATA));
+                localStorage.removeItem('f_vs_v_jeopardy_data');
+                buildEditorForm();
+                renderHeaderScores();
+                renderBoard();
+                toggleEditor();
+            }
+        }
+    </script>
+</body>
+</html>
